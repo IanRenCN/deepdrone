@@ -20,6 +20,7 @@ from dotenv import load_dotenv
 from drone.config import ModelConfig
 from drone.llm_interface import LLMInterface
 from drone.drone_control import DroneController
+from drone.webots_drone_adapter import WebotsDroneAdapter
 from drone.function_tools import FunctionExecutor, format_function_schemas_for_ollama, FUNCTION_SCHEMAS
 
 # Load environment variables
@@ -124,20 +125,36 @@ async def configure_ai(config: ConfigRequest):
 
 @app.post("/api/drone/connect")
 async def connect_drone(request: DroneConnectionRequest):
-    """Connect to drone."""
+    """Connect to drone (DroneKit or Webots)."""
     global drone_controller
 
     try:
+        connection_string = request.connection_string.lower()
         print(f"🔌 Attempting to connect to drone at: {request.connection_string}")
 
-        drone_controller = DroneController(request.connection_string)
+        # Detect connection type: Webots UDP or DroneKit
+        is_webots = (
+            connection_string == "webots" or 
+            connection_string.startswith("udp:") and ":9000" in connection_string or
+            "webots" in connection_string
+        )
+
+        if is_webots:
+            print("🎮 Using Webots UDP controller")
+            drone_controller = WebotsDroneAdapter(request.connection_string)
+        else:
+            print("🚁 Using DroneKit controller (MAVLink)")
+            drone_controller = DroneController(request.connection_string)
+
         success = drone_controller.connect_to_drone()
 
         if success:
-            print(f"✅ Successfully connected to drone")
+            controller_type = "Webots simulator" if is_webots else "drone"
+            print(f"✅ Successfully connected to {controller_type}")
             return {
                 "status": "success",
-                "message": f"Connected to drone at {request.connection_string}"
+                "message": f"Connected to {controller_type} at {request.connection_string}",
+                "controller_type": "webots" if is_webots else "dronekit"
             }
         else:
             error_msg = "Failed to connect to drone. Make sure the simulator is running (should be started automatically by start.sh)"
@@ -177,23 +194,36 @@ async def disconnect_drone():
 @app.get("/api/drone/status")
 async def get_drone_status():
     """Get current drone status."""
-    if not drone_controller or not drone_controller.connected:
+    if not drone_controller:
+        return {"connected": False}
+    
+    # Check connected status - handle both DroneKit and Webots
+    if not drone_controller.connected:
         return {"connected": False}
 
     try:
         vehicle = drone_controller.vehicle
+        if not vehicle:
+            # This shouldn't happen, but handle it
+            print(f"⚠️  WARNING: Controller connected but vehicle is None")
+            return {"connected": False, "error": "Vehicle object not initialized"}
+        
         return {
             "connected": True,
-            "mode": str(vehicle.mode.name),
+            "mode": str(vehicle.mode.name) if hasattr(vehicle.mode, 'name') else str(vehicle.mode),
             "armed": vehicle.armed,
-            "battery": vehicle.battery.level if vehicle.battery else None,
-            "altitude": vehicle.location.global_relative_frame.alt if vehicle.location else None,
+            "battery": vehicle.battery.level if hasattr(vehicle, 'battery') and vehicle.battery else 100.0,
+            "altitude": vehicle.location.global_relative_frame.alt if hasattr(vehicle, 'location') and vehicle.location else 0.0,
             "gps": {
-                "lat": vehicle.location.global_frame.lat if vehicle.location else None,
-                "lon": vehicle.location.global_frame.lon if vehicle.location else None
+                "lat": vehicle.location.global_frame.lat if hasattr(vehicle, 'location') and vehicle.location else 0.0,
+                "lon": vehicle.location.global_frame.lon if hasattr(vehicle, 'location') and vehicle.location else 0.0
             }
         }
     except Exception as e:
+        # Log the actual error for debugging
+        print(f"❌ Error getting drone status: {e}")
+        import traceback
+        traceback.print_exc()
         return {"connected": False, "error": str(e)}
 
 @app.websocket("/ws/chat")
@@ -241,7 +271,9 @@ async def websocket_chat(websocket: WebSocket):
                 if drone_controller and drone_controller.connected:
                     status = await get_drone_status()
                     drone_context = f"\nCurrent Drone Status: {json.dumps(status, indent=2)}"
-                    print(f"🚁 Added drone context")
+                    print(f"🚁 Added drone context: connected={status.get('connected', False)}")
+                else:
+                    print(f"⚠️  Drone not connected (controller exists: {drone_controller is not None}, connected: {drone_controller.connected if drone_controller else False})")
 
                 # Add function schemas for Ollama
                 functions_info = ""
@@ -249,17 +281,29 @@ async def websocket_chat(websocket: WebSocket):
                     functions_info = "\n\n" + format_function_schemas_for_ollama(FUNCTION_SCHEMAS)
 
                 # Create messages for LLM
+                # Check connection status for better prompt
+                is_connected = drone_controller and drone_controller.connected if drone_controller else False
+                connection_note = "The drone IS CONNECTED and ready for commands." if is_connected else "The drone is NOT CONNECTED. Tell the user to connect first."
+                
                 system_prompt = f"""You are DeepDrone AI, an assistant that controls drones using natural language.
 
-IMPORTANT: When the user asks you to perform a drone action (like takeoff, land, fly somewhere, etc.), you MUST execute the appropriate function immediately. Do NOT just provide instructions - actually execute the command.
+{connection_note}
 {drone_context}
+
+IMPORTANT: When the user asks you to perform a drone action (like takeoff, land, fly somewhere, etc.), you MUST execute the appropriate function immediately. Do NOT just provide instructions - actually execute the command.
+
 {functions_info}
 
 When executing commands:
-1. Use the functions to perform the action
-2. After getting the function result, explain what happened to the user in a friendly way
+1. ALWAYS check the drone status above - if connected is true, the drone IS ready
+2. Use the functions to perform the action
+3. After getting the function result, explain what happened to the user in a friendly way
 
-If the drone is not connected, politely inform them to connect the drone first through the Settings menu."""
+Example of how to execute a function:
+User: "Take off to 20 meters"
+Your response:
+EXECUTE_FUNCTION: arm_and_takeoff
+ARGUMENTS: {{"altitude": 20}}"""
 
                 messages = [
                     {"role": "system", "content": system_prompt},

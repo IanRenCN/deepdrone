@@ -99,6 +99,13 @@ class FunctionExecutor:
                 "error": "Drone not connected. Please connect to the drone first."
             }
         
+        # Check if drone is actually connected (handles both DroneKit and Webots)
+        if hasattr(self.drone_controller, 'connected') and not self.drone_controller.connected:
+            return {
+                "success": False,
+                "error": "Drone not connected. Please connect to the drone first."
+            }
+        
         try:
             if function_name == "arm_and_takeoff":
                 altitude = arguments.get("altitude")
@@ -199,11 +206,19 @@ def format_function_schemas_for_ollama(schemas: List[Dict]) -> str:
         
         functions_desc += "\n"
     
-    functions_desc += """To execute a function, respond with:
+    functions_desc += """To execute a function, you MUST respond EXACTLY in this format:
 EXECUTE_FUNCTION: function_name
 ARGUMENTS: {"param1": value1, "param2": value2}
 
-After executing the function, I will provide you with the result, and you should explain it to the user in natural language.
+CRITICAL: Use the exact format above. Do NOT add extra text before or after. Do NOT explain what you're doing - just execute the function.
+
+Example:
+User: "Take off to 20 meters"
+Your response:
+EXECUTE_FUNCTION: arm_and_takeoff
+ARGUMENTS: {"altitude": 20}
+
+After executing the function, I will provide you with the result, and THEN you should explain it to the user in natural language.
 """
     
     return functions_desc

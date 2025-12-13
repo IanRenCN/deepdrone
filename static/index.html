@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚁 DeepDrone - AI-Powered Drone Control</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Left Sidebar - Configuration -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h1>🚁 DeepDrone</h1>
+                <p class="subtitle">AI-Powered Drone Control</p>
+            </div>
+
+            <!-- AI Provider Configuration -->
+            <div class="config-section">
+                <h2>AI Configuration</h2>
+
+                <div class="form-group">
+                    <label for="provider">AI Provider</label>
+                    <select id="provider" class="input-field">
+                        <option value="">Select Provider...</option>
+                        <option value="openai">OpenAI (GPT)</option>
+                        <option value="anthropic">Anthropic (Claude)</option>
+                        <option value="google">Google (Gemini)</option>
+                        <option value="ollama">Ollama (Local)</option>
+                    </select>
+                </div>
+
+                <div id="apiKeyGroup" class="form-group" style="display: none;">
+                    <label for="apiKey">API Key</label>
+                    <input type="password" id="apiKey" class="input-field" placeholder="Enter your API key">
+                    <small class="help-text">Your key is stored locally and not sent to our servers</small>
+                </div>
+
+                <div id="modelGroup" class="form-group" style="display: none;">
+                    <label for="model">Model</label>
+                    <select id="model" class="input-field">
+                        <option value="">Select Model...</option>
+                    </select>
+                    <div id="modelLoading" class="loading-spinner" style="display: none;">
+                        Loading models...
+                    </div>
+                </div>
+
+                <button id="configureBtn" class="btn btn-primary" disabled>
+                    Configure AI
+                </button>
+
+                <div id="configStatus" class="status-message"></div>
+            </div>
+
+            <!-- Drone Connection -->
+            <div class="config-section">
+                <h2>Drone Connection</h2>
+
+                <div class="form-group">
+                    <label for="connectionString">Connection String</label>
+                    <input type="text" id="connectionString" class="input-field"
+                           placeholder="udp:127.0.0.1:14550" value="udp:127.0.0.1:14550">
+                    <small class="help-text">Default: udp:127.0.0.1:14550 (simulator)</small>
+                </div>
+
+                <div class="button-group">
+                    <button id="connectDroneBtn" class="btn btn-secondary">
+                        Connect Drone
+                    </button>
+                    <button id="disconnectDroneBtn" class="btn btn-secondary" style="display: none;">
+                        Disconnect
+                    </button>
+                </div>
+
+                <div id="droneStatus" class="status-message"></div>
+
+                <!-- Drone Telemetry -->
+                <div id="telemetry" style="display: none;">
+                    <h3>Telemetry</h3>
+                    <div class="telemetry-grid">
+                        <div class="telemetry-item">
+                            <span class="telemetry-label">Mode:</span>
+                            <span id="telemetryMode" class="telemetry-value">-</span>
+                        </div>
+                        <div class="telemetry-item">
+                            <span class="telemetry-label">Armed:</span>
+                            <span id="telemetryArmed" class="telemetry-value">-</span>
+                        </div>
+                        <div class="telemetry-item">
+                            <span class="telemetry-label">Altitude:</span>
+                            <span id="telemetryAlt" class="telemetry-value">-</span>
+                        </div>
+                        <div class="telemetry-item">
+                            <span class="telemetry-label">Battery:</span>
+                            <span id="telemetryBattery" class="telemetry-value">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Status Indicators -->
+            <div class="status-indicators">
+                <div class="indicator">
+                    <span class="indicator-dot" id="aiIndicator"></span>
+                    <span>AI: <span id="aiStatus">Not Configured</span></span>
+                </div>
+                <div class="indicator">
+                    <span class="indicator-dot" id="droneIndicator"></span>
+                    <span>Drone: <span id="droneStatusText">Disconnected</span></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Chat Area -->
+        <div class="main-content">
+            <div class="chat-header">
+                <h2>Chat with DeepDrone AI</h2>
+                <button id="clearChatBtn" class="btn btn-small">Clear Chat</button>
+            </div>
+
+            <div id="chatMessages" class="chat-messages">
+                <div class="welcome-message">
+                    <h3>👋 Welcome to DeepDrone!</h3>
+                    <p>Configure your AI provider and connect to a drone to get started.</p>
+                    <p>Once connected, you can use natural language to control your drone:</p>
+                    <ul>
+                        <li>"Take off to 20 meters"</li>
+                        <li>"Fly in a square pattern with 50m sides"</li>
+                        <li>"Return home and land"</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="chat-input-container">
+                <textarea id="chatInput" class="chat-input" placeholder="Type your message here..." rows="3"></textarea>
+                <button id="sendBtn" class="btn btn-primary send-btn" disabled>
+                    Send
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

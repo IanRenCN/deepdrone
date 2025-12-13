@@ -14,3 +14,7 @@ pydantic
 pydantic-settings
 typer
 prompt-toolkit
+fastapi
+uvicorn[standard]
+websockets
+aiofiles

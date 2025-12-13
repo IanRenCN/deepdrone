@@ -1,6 +1,6 @@
 # 🚁 DeepDrone
 
-![DeepDrone Demo](media/demo.png)
+![DeepDrone Demo](media/deepdrone_ui.png)
 
 **Control drones with natural language using AI - OpenAI, Anthropic, Google, or local Ollama models.**
 

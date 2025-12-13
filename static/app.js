@@ -1,191 +1,258 @@
-// DeepDrone Web Application
-// Handles UI interactions, WebSocket communication, and API calls
+// DeepDrone - Minimal ChatGPT-style Interface
 
-class DeepDroneApp {
+class DeepDrone {
     constructor() {
         this.ws = null;
         this.isAIConfigured = false;
         this.isDroneConnected = false;
         this.telemetryInterval = null;
 
-        this.initializeElements();
+        this.init();
+    }
+
+    init() {
+        this.cacheElements();
         this.attachEventListeners();
         this.loadSavedConfig();
         this.checkHealth();
     }
 
-    initializeElements() {
-        // Configuration elements
-        this.providerSelect = document.getElementById('provider');
-        this.apiKeyGroup = document.getElementById('apiKeyGroup');
-        this.apiKeyInput = document.getElementById('apiKey');
-        this.modelGroup = document.getElementById('modelGroup');
-        this.modelSelect = document.getElementById('model');
-        this.modelLoading = document.getElementById('modelLoading');
-        this.configureBtn = document.getElementById('configureBtn');
-        this.configStatus = document.getElementById('configStatus');
+    cacheElements() {
+        // Sidebar
+        this.sidebar = document.getElementById('sidebar');
+        this.toggleSidebarBtn = document.getElementById('toggleSidebarBtn');
+        this.openSidebarBtn = document.getElementById('openSidebarBtn');
+        this.newChatBtn = document.getElementById('newChatBtn');
 
-        // Drone connection elements
+        // Modals
+        this.settingsModal = document.getElementById('settingsModal');
+        this.droneModal = document.getElementById('droneModal');
+        this.settingsBtn = document.getElementById('settingsBtn');
+        this.droneConnectBtn = document.getElementById('droneConnectBtn');
+        this.closeSettingsBtn = document.getElementById('closeSettingsBtn');
+        this.closeDroneBtn = document.getElementById('closeDroneBtn');
+
+        // Settings form
+        this.provider = document.getElementById('provider');
+        this.apiKeyGroup = document.getElementById('apiKeyGroup');
+        this.apiKey = document.getElementById('apiKey');
+        this.modelGroup = document.getElementById('modelGroup');
+        this.model = document.getElementById('model');
+        this.saveAIBtn = document.getElementById('saveAIBtn');
+        this.aiStatus = document.getElementById('aiStatus');
+
+        // Drone form
         this.connectionString = document.getElementById('connectionString');
-        this.connectDroneBtn = document.getElementById('connectDroneBtn');
-        this.disconnectDroneBtn = document.getElementById('disconnectDroneBtn');
+        this.connectBtn = document.getElementById('connectBtn');
+        this.disconnectBtn = document.getElementById('disconnectBtn');
         this.droneStatus = document.getElementById('droneStatus');
 
-        // Chat elements
-        this.chatMessages = document.getElementById('chatMessages');
-        this.chatInput = document.getElementById('chatInput');
+        // Chat
+        this.messages = document.getElementById('messages');
+        this.messageInput = document.getElementById('messageInput');
         this.sendBtn = document.getElementById('sendBtn');
-        this.clearChatBtn = document.getElementById('clearChatBtn');
 
-        // Status indicators
-        this.aiIndicator = document.getElementById('aiIndicator');
-        this.aiStatus = document.getElementById('aiStatus');
-        this.droneIndicator = document.getElementById('droneIndicator');
-        this.droneStatusText = document.getElementById('droneStatusText');
+        // Top bar
+        this.currentModel = document.getElementById('currentModel');
+        this.statusDot = document.getElementById('statusDot');
 
         // Telemetry
-        this.telemetrySection = document.getElementById('telemetry');
-        this.telemetryMode = document.getElementById('telemetryMode');
-        this.telemetryArmed = document.getElementById('telemetryArmed');
-        this.telemetryAlt = document.getElementById('telemetryAlt');
-        this.telemetryBattery = document.getElementById('telemetryBattery');
+        this.telemetryPanel = document.getElementById('telemetryPanel');
+        this.telemetryToggleBtn = document.getElementById('telemetryToggleBtn');
+        this.closeTelemetryBtn = document.getElementById('closeTelemetryBtn');
+        this.telemMode = document.getElementById('telemMode');
+        this.telemArmed = document.getElementById('telemArmed');
+        this.telemAlt = document.getElementById('telemAlt');
+        this.telemBattery = document.getElementById('telemBattery');
     }
 
     attachEventListeners() {
-        // Provider selection
-        this.providerSelect.addEventListener('change', () => this.onProviderChange());
+        // Sidebar toggle
+        this.toggleSidebarBtn.addEventListener('click', () => this.toggleSidebar());
+        this.openSidebarBtn.addEventListener('click', () => this.toggleSidebar());
+        this.newChatBtn.addEventListener('click', () => this.newChat());
 
-        // Configure AI button
-        this.configureBtn.addEventListener('click', () => this.configureAI());
+        // Modal controls
+        this.settingsBtn.addEventListener('click', () => this.openModal(this.settingsModal));
+        this.droneConnectBtn.addEventListener('click', () => this.openModal(this.droneModal));
+        this.closeSettingsBtn.addEventListener('click', () => this.closeModal(this.settingsModal));
+        this.closeDroneBtn.addEventListener('click', () => this.closeModal(this.droneModal));
 
-        // Drone connection
-        this.connectDroneBtn.addEventListener('click', () => this.connectDrone());
-        this.disconnectDroneBtn.addEventListener('click', () => this.disconnectDrone());
+        // Click outside modal to close
+        this.settingsModal.addEventListener('click', (e) => {
+            if (e.target === this.settingsModal) this.closeModal(this.settingsModal);
+        });
+        this.droneModal.addEventListener('click', (e) => {
+            if (e.target === this.droneModal) this.closeModal(this.droneModal);
+        });
+
+        // Settings
+        this.provider.addEventListener('change', () => this.onProviderChange());
+        this.model.addEventListener('change', () => this.updateSaveButton());
+        this.apiKey.addEventListener('input', () => this.updateSaveButton());
+        this.saveAIBtn.addEventListener('click', () => this.saveAISettings());
+
+        // Drone
+        this.connectBtn.addEventListener('click', () => this.connectDrone());
+        this.disconnectBtn.addEventListener('click', () => this.disconnectDrone());
 
         // Chat
+        this.messageInput.addEventListener('input', () => this.handleInputChange());
+        this.messageInput.addEventListener('keydown', (e) => this.handleKeyDown(e));
         this.sendBtn.addEventListener('click', () => this.sendMessage());
-        this.chatInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
+
+        // Suggestion cards
+        document.querySelectorAll('.suggestion-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const prompt = card.dataset.prompt;
+                this.messageInput.value = prompt;
+                this.handleInputChange();
                 this.sendMessage();
-            }
+            });
         });
-        this.clearChatBtn.addEventListener('click', () => this.clearChat());
+
+        // Telemetry
+        this.telemetryToggleBtn.addEventListener('click', () => this.toggleTelemetry());
+        this.closeTelemetryBtn.addEventListener('click', () => this.toggleTelemetry());
     }
 
-    // Provider Models Configuration
+    // Sidebar
+    toggleSidebar() {
+        this.sidebar.classList.toggle('collapsed');
+        if (this.sidebar.classList.contains('collapsed')) {
+            this.openSidebarBtn.style.display = 'flex';
+        } else {
+            this.openSidebarBtn.style.display = 'none';
+        }
+    }
+
+    newChat() {
+        this.messages.innerHTML = `
+            <div class="welcome-screen">
+                <div class="welcome-icon">🚁</div>
+                <h1>DeepDrone</h1>
+                <p>Control your drone with natural language</p>
+                <div class="suggestion-grid">
+                    <button class="suggestion-card" data-prompt="Take off to 20 meters">
+                        <div class="suggestion-title">Take Off</div>
+                        <div class="suggestion-text">Take off to 20 meters</div>
+                    </button>
+                    <button class="suggestion-card" data-prompt="What's my current altitude and battery status?">
+                        <div class="suggestion-title">Check Status</div>
+                        <div class="suggestion-text">Get altitude and battery</div>
+                    </button>
+                    <button class="suggestion-card" data-prompt="Fly in a square pattern with 30m sides">
+                        <div class="suggestion-title">Square Pattern</div>
+                        <div class="suggestion-text">Fly in a square pattern</div>
+                    </button>
+                    <button class="suggestion-card" data-prompt="Return home and land safely">
+                        <div class="suggestion-title">Return Home</div>
+                        <div class="suggestion-text">Return and land safely</div>
+                    </button>
+                </div>
+            </div>
+        `;
+        // Reattach suggestion card listeners
+        this.attachEventListeners();
+    }
+
+    // Modal controls
+    openModal(modal) {
+        modal.classList.add('open');
+    }
+
+    closeModal(modal) {
+        modal.classList.remove('open');
+    }
+
+    // AI Configuration
     getProviderModels(provider) {
         const models = {
-            openai: [
-                'gpt-4o',
-                'gpt-4o-mini',
-                'gpt-4-turbo',
-                'gpt-3.5-turbo'
-            ],
-            anthropic: [
-                'claude-3-5-sonnet-20241022',
-                'claude-3-sonnet-20240229',
-                'claude-3-haiku-20240307'
-            ],
-            google: [
-                'gemini-1.5-pro',
-                'gemini-1.5-flash',
-                'gemini-pro'
-            ],
-            ollama: [] // Will be loaded dynamically
+            openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'],
+            anthropic: ['claude-3-5-sonnet-20241022', 'claude-3-sonnet-20240229', 'claude-3-haiku-20240307'],
+            google: ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-pro'],
+            ollama: []
         };
         return models[provider] || [];
     }
 
     async onProviderChange() {
-        const provider = this.providerSelect.value;
+        const provider = this.provider.value;
 
         if (!provider) {
             this.apiKeyGroup.style.display = 'none';
             this.modelGroup.style.display = 'none';
-            this.configureBtn.disabled = true;
+            this.saveAIBtn.disabled = true;
             return;
         }
 
-        // Show/hide API key field based on provider
-        if (provider === 'ollama') {
-            this.apiKeyGroup.style.display = 'none';
-        } else {
-            this.apiKeyGroup.style.display = 'block';
-        }
-
+        this.apiKeyGroup.style.display = provider === 'ollama' ? 'none' : 'block';
         this.modelGroup.style.display = 'block';
-        this.modelSelect.innerHTML = '<option value="">Select Model...</option>';
+        this.model.innerHTML = '<option value="">Loading...</option>';
 
-        // Load models
         if (provider === 'ollama') {
             await this.loadOllamaModels();
         } else {
             const models = this.getProviderModels(provider);
-            models.forEach(model => {
+            this.model.innerHTML = '<option value="">Select model...</option>';
+            models.forEach(m => {
                 const option = document.createElement('option');
-                option.value = model;
-                option.textContent = model;
-                this.modelSelect.appendChild(option);
+                option.value = m;
+                option.textContent = m;
+                this.model.appendChild(option);
             });
         }
 
-        this.updateConfigureButton();
+        this.updateSaveButton();
     }
 
     async loadOllamaModels() {
-        this.modelLoading.style.display = 'block';
-        this.modelSelect.disabled = true;
-
         try {
             const response = await fetch('/api/ollama/models');
             const data = await response.json();
 
+            this.model.innerHTML = '<option value="">Select model...</option>';
+
             if (data.models && data.models.length > 0) {
-                data.models.forEach(model => {
+                data.models.forEach(m => {
                     const option = document.createElement('option');
-                    option.value = model;
-                    option.textContent = model;
-                    this.modelSelect.appendChild(option);
+                    option.value = m;
+                    option.textContent = m;
+                    this.model.appendChild(option);
                 });
             } else {
                 const option = document.createElement('option');
                 option.value = '';
-                option.textContent = data.error || 'No Ollama models found';
-                this.modelSelect.appendChild(option);
+                option.textContent = data.error || 'No models found';
+                this.model.appendChild(option);
             }
         } catch (error) {
             console.error('Error loading Ollama models:', error);
-            this.showStatus(this.configStatus, 'Error loading Ollama models', 'error');
-        } finally {
-            this.modelLoading.style.display = 'none';
-            this.modelSelect.disabled = false;
+            this.showStatus(this.aiStatus, 'Error loading Ollama models', 'error');
         }
     }
 
-    updateConfigureButton() {
-        const provider = this.providerSelect.value;
-        const model = this.modelSelect.value;
-        const apiKey = this.apiKeyInput.value;
+    updateSaveButton() {
+        const provider = this.provider.value;
+        const model = this.model.value;
+        const apiKey = this.apiKey.value;
 
         if (provider === 'ollama') {
-            this.configureBtn.disabled = !provider || !model;
+            this.saveAIBtn.disabled = !provider || !model;
         } else {
-            this.configureBtn.disabled = !provider || !model || !apiKey;
+            this.saveAIBtn.disabled = !provider || !model || !apiKey;
         }
     }
 
-    async configureAI() {
-        const provider = this.providerSelect.value;
-        const model = this.modelSelect.value;
-        const apiKey = provider === 'ollama' ? null : this.apiKeyInput.value;
+    async saveAISettings() {
+        const provider = this.provider.value;
+        const model = this.model.value;
+        const apiKey = provider === 'ollama' ? null : this.apiKey.value;
 
         try {
             const response = await fetch('/api/config', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ provider, model, api_key: apiKey })
             });
 
@@ -193,91 +260,96 @@ class DeepDroneApp {
 
             if (response.ok) {
                 this.isAIConfigured = true;
-                this.updateAIStatus(true);
-                this.showStatus(this.configStatus, `✓ ${data.message}`, 'success');
+                this.updateStatus(true, false);
+                this.showStatus(this.aiStatus, '✓ ' + data.message, 'success');
+                this.currentModel.textContent = `${provider} - ${model.split('/').pop()}`;
                 this.sendBtn.disabled = false;
                 this.saveConfig({ provider, model });
                 this.connectWebSocket();
+
+                setTimeout(() => {
+                    this.closeModal(this.settingsModal);
+                }, 1500);
             } else {
                 throw new Error(data.detail || 'Configuration failed');
             }
         } catch (error) {
-            console.error('Error configuring AI:', error);
-            this.showStatus(this.configStatus, `✗ ${error.message}`, 'error');
+            this.showStatus(this.aiStatus, '✗ ' + error.message, 'error');
         }
     }
 
+    // Drone Connection
     async connectDrone() {
-        const connectionStr = this.connectionString.value;
+        const connStr = this.connectionString.value;
 
-        if (!connectionStr) {
+        if (!connStr) {
             this.showStatus(this.droneStatus, 'Please enter a connection string', 'error');
             return;
         }
 
         try {
-            this.connectDroneBtn.disabled = true;
+            this.connectBtn.disabled = true;
             this.showStatus(this.droneStatus, 'Connecting...', 'success');
 
             const response = await fetch('/api/drone/connect', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ connection_string: connectionStr })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ connection_string: connStr })
             });
 
             const data = await response.json();
 
             if (response.ok) {
                 this.isDroneConnected = true;
-                this.updateDroneStatus(true);
-                this.showStatus(this.droneStatus, `✓ ${data.message}`, 'success');
-                this.connectDroneBtn.style.display = 'none';
-                this.disconnectDroneBtn.style.display = 'block';
-                this.startTelemetryUpdates();
+                this.updateStatus(this.isAIConfigured, true);
+                this.showStatus(this.droneStatus, '✓ ' + data.message, 'success');
+                this.connectBtn.style.display = 'none';
+                this.disconnectBtn.style.display = 'block';
+                this.startTelemetry();
+
+                setTimeout(() => {
+                    this.closeModal(this.droneModal);
+                }, 1500);
             } else {
                 throw new Error(data.detail || 'Connection failed');
             }
         } catch (error) {
-            console.error('Error connecting to drone:', error);
-            this.showStatus(this.droneStatus, `✗ ${error.message}`, 'error');
+            this.showStatus(this.droneStatus, '✗ ' + error.message, 'error');
         } finally {
-            this.connectDroneBtn.disabled = false;
+            this.connectBtn.disabled = false;
         }
     }
 
     async disconnectDrone() {
         try {
-            const response = await fetch('/api/drone/disconnect', {
-                method: 'POST'
-            });
+            await fetch('/api/drone/disconnect', { method: 'POST' });
 
-            if (response.ok) {
-                this.isDroneConnected = false;
-                this.updateDroneStatus(false);
-                this.showStatus(this.droneStatus, 'Disconnected', 'success');
-                this.connectDroneBtn.style.display = 'block';
-                this.disconnectDroneBtn.style.display = 'none';
-                this.stopTelemetryUpdates();
-            }
+            this.isDroneConnected = false;
+            this.updateStatus(this.isAIConfigured, false);
+            this.showStatus(this.droneStatus, 'Disconnected', 'success');
+            this.connectBtn.style.display = 'block';
+            this.disconnectBtn.style.display = 'none';
+            this.stopTelemetry();
         } catch (error) {
-            console.error('Error disconnecting from drone:', error);
+            console.error('Error disconnecting:', error);
         }
     }
 
-    startTelemetryUpdates() {
-        this.telemetrySection.style.display = 'block';
+    // Telemetry
+    toggleTelemetry() {
+        this.telemetryPanel.classList.toggle('open');
+    }
+
+    startTelemetry() {
         this.updateTelemetry();
         this.telemetryInterval = setInterval(() => this.updateTelemetry(), 1000);
     }
 
-    stopTelemetryUpdates() {
+    stopTelemetry() {
         if (this.telemetryInterval) {
             clearInterval(this.telemetryInterval);
             this.telemetryInterval = null;
         }
-        this.telemetrySection.style.display = 'none';
     }
 
     async updateTelemetry() {
@@ -286,141 +358,121 @@ class DeepDroneApp {
             const data = await response.json();
 
             if (data.connected) {
-                this.telemetryMode.textContent = data.mode || '-';
-                this.telemetryArmed.textContent = data.armed ? 'Yes' : 'No';
-                this.telemetryAlt.textContent = data.altitude ? `${data.altitude.toFixed(1)}m` : '-';
-                this.telemetryBattery.textContent = data.battery ? `${data.battery}%` : '-';
+                this.telemMode.textContent = data.mode || '-';
+                this.telemArmed.textContent = data.armed ? 'Yes' : 'No';
+                this.telemAlt.textContent = data.altitude ? `${data.altitude.toFixed(1)}m` : '-';
+                this.telemBattery.textContent = data.battery ? `${data.battery}%` : '-';
             }
         } catch (error) {
-            console.error('Error updating telemetry:', error);
+            console.error('Telemetry error:', error);
         }
     }
 
-    connectWebSocket() {
-        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            return;
+    // Chat
+    handleInputChange() {
+        const value = this.messageInput.value.trim();
+        this.sendBtn.disabled = !value || !this.isAIConfigured;
+
+        // Auto-resize textarea
+        this.messageInput.style.height = 'auto';
+        this.messageInput.style.height = this.messageInput.scrollHeight + 'px';
+    }
+
+    handleKeyDown(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            this.sendMessage();
         }
+    }
+
+    sendMessage() {
+        const message = this.messageInput.value.trim();
+
+        if (!message || !this.isAIConfigured) return;
+
+        // Remove welcome screen
+        const welcome = this.messages.querySelector('.welcome-screen');
+        if (welcome) welcome.remove();
+
+        // Add user message
+        this.addMessage(message, 'user');
+
+        // Send to server
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify({ message }));
+        }
+
+        // Clear input
+        this.messageInput.value = '';
+        this.messageInput.style.height = 'auto';
+        this.handleInputChange();
+    }
+
+    addMessage(content, type) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${type}`;
+
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content';
+        contentDiv.textContent = content;
+
+        messageDiv.appendChild(contentDiv);
+        this.messages.appendChild(messageDiv);
+
+        // Scroll to bottom
+        this.messages.parentElement.scrollTop = this.messages.parentElement.scrollHeight;
+    }
+
+    // WebSocket
+    connectWebSocket() {
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
 
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${protocol}//${window.location.host}/ws/chat`;
 
         this.ws = new WebSocket(wsUrl);
 
-        this.ws.onopen = () => {
-            console.log('WebSocket connected');
-        };
+        this.ws.onopen = () => console.log('WebSocket connected');
 
         this.ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
-            this.handleWebSocketMessage(data);
+
+            if (data.type === 'ai_message') {
+                this.addMessage(data.content, 'assistant');
+            } else if (data.type === 'error') {
+                this.addMessage(data.content, 'error');
+            }
         };
 
-        this.ws.onerror = (error) => {
-            console.error('WebSocket error:', error);
-        };
+        this.ws.onerror = (error) => console.error('WebSocket error:', error);
 
         this.ws.onclose = () => {
-            console.log('WebSocket disconnected');
-            // Attempt to reconnect after 3 seconds
+            console.log('WebSocket closed');
             setTimeout(() => {
-                if (this.isAIConfigured) {
-                    this.connectWebSocket();
-                }
+                if (this.isAIConfigured) this.connectWebSocket();
             }, 3000);
         };
     }
 
-    handleWebSocketMessage(data) {
-        switch (data.type) {
-            case 'user_message':
-                // Already displayed, no action needed
-                break;
-            case 'ai_message':
-                this.addMessage(data.content, 'ai');
-                break;
-            case 'error':
-                this.addMessage(data.content, 'error');
-                break;
+    // Status
+    updateStatus(aiConfigured, droneConnected) {
+        if (aiConfigured || droneConnected) {
+            this.statusDot.classList.add('connected');
+        } else {
+            this.statusDot.classList.remove('connected');
         }
-    }
-
-    sendMessage() {
-        const message = this.chatInput.value.trim();
-
-        if (!message) return;
-
-        if (!this.isAIConfigured) {
-            alert('Please configure an AI provider first');
-            return;
-        }
-
-        // Add user message to chat
-        this.addMessage(message, 'user');
-
-        // Send via WebSocket
-        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            this.ws.send(JSON.stringify({ message }));
-        }
-
-        // Clear input
-        this.chatInput.value = '';
-        this.chatInput.style.height = 'auto';
-    }
-
-    addMessage(content, type) {
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `message ${type}-message`;
-
-        const avatar = document.createElement('div');
-        avatar.className = 'message-avatar';
-        avatar.textContent = type === 'user' ? '👤' : type === 'error' ? '⚠️' : '🤖';
-
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'message-content';
-        contentDiv.textContent = content;
-
-        messageDiv.appendChild(avatar);
-        messageDiv.appendChild(contentDiv);
-
-        // Remove welcome message if present
-        const welcomeMessage = this.chatMessages.querySelector('.welcome-message');
-        if (welcomeMessage) {
-            welcomeMessage.remove();
-        }
-
-        this.chatMessages.appendChild(messageDiv);
-        this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
-    }
-
-    clearChat() {
-        this.chatMessages.innerHTML = `
-            <div class="welcome-message">
-                <h3>👋 Chat cleared!</h3>
-                <p>Start a new conversation with DeepDrone AI.</p>
-            </div>
-        `;
-    }
-
-    updateAIStatus(configured) {
-        this.aiIndicator.classList.toggle('active', configured);
-        this.aiStatus.textContent = configured ? 'Configured' : 'Not Configured';
-    }
-
-    updateDroneStatus(connected) {
-        this.droneIndicator.classList.toggle('active', connected);
-        this.droneStatusText.textContent = connected ? 'Connected' : 'Disconnected';
     }
 
     showStatus(element, message, type) {
         element.textContent = message;
-        element.className = `status-message ${type}`;
-        element.style.display = 'block';
+        element.className = `status-msg ${type}`;
 
         setTimeout(() => {
-            element.style.display = 'none';
+            element.className = 'status-msg';
         }, 5000);
     }
 
+    // Storage
     saveConfig(config) {
         localStorage.setItem('deepdrone_config', JSON.stringify(config));
     }
@@ -430,13 +482,13 @@ class DeepDroneApp {
         if (saved) {
             try {
                 const config = JSON.parse(saved);
-                this.providerSelect.value = config.provider;
+                this.provider.value = config.provider;
                 this.onProviderChange().then(() => {
-                    this.modelSelect.value = config.model;
-                    this.updateConfigureButton();
+                    this.model.value = config.model;
+                    this.updateSaveButton();
                 });
             } catch (error) {
-                console.error('Error loading saved config:', error);
+                console.error('Error loading config:', error);
             }
         }
     }
@@ -448,22 +500,23 @@ class DeepDroneApp {
 
             if (data.llm_configured) {
                 this.isAIConfigured = true;
-                this.updateAIStatus(true);
                 this.sendBtn.disabled = false;
                 this.connectWebSocket();
             }
 
             if (data.drone_connected) {
                 this.isDroneConnected = true;
-                this.updateDroneStatus(true);
+                this.startTelemetry();
             }
+
+            this.updateStatus(data.llm_configured, data.drone_connected);
         } catch (error) {
             console.error('Health check failed:', error);
         }
     }
 }
 
-// Initialize app when DOM is ready
+// Initialize
 document.addEventListener('DOMContentLoaded', () => {
-    new DeepDroneApp();
+    new DeepDrone();
 });

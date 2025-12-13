@@ -130,16 +130,38 @@ body {
     font-weight: 500;
 }
 
-.status-dot {
-    width: 8px;
-    height: 8px;
+.status-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.status-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    font-size: 13px;
+}
+
+.status-badge.connected {
+    background: rgba(16, 163, 127, 0.1);
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+}
+
+.status-badge .status-dot {
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
     background: #666;
 }
 
-.status-dot.connected {
+.status-badge.connected .status-dot {
     background: var(--accent-color);
-    box-shadow: 0 0 8px var(--accent-color);
 }
 
 /* Chat Container */
@@ -246,6 +268,44 @@ body {
     line-height: 1.6;
     white-space: pre-wrap;
     word-wrap: break-word;
+}
+
+/* Typing Indicator */
+.typing-indicator {
+    opacity: 0.6;
+}
+
+.typing-dots {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.typing-dots span {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-secondary);
+    animation: typing 1.4s infinite;
+}
+
+.typing-dots span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.typing-dots span:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes typing {
+    0%, 60%, 100% {
+        opacity: 0.3;
+        transform: scale(0.8);
+    }
+    30% {
+        opacity: 1;
+        transform: scale(1);
+    }
 }
 
 /* Telemetry Panel */
@@ -477,6 +537,52 @@ body {
 
 .drone-actions button {
     flex: 1;
+}
+
+.drone-section {
+    background: var(--bg-tertiary);
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.connection-notice {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px;
+    background: rgba(16, 163, 127, 0.1);
+    border: 1px solid var(--accent-color);
+    border-radius: 8px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    color: var(--accent-color);
+}
+
+.btn-primary-drone {
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: none;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: #fff;
+    color: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.btn-primary-drone:hover:not(:disabled) {
+    background: #e8e8e8;
+}
+
+.btn-primary-drone:disabled {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    cursor: not-allowed;
 }
 
 .form-group {

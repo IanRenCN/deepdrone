@@ -9,10 +9,11 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
 setup(
     name="deepdrone",
     version="1.0.0",
-    description="DeepDrone - AI-powered drone control terminal application",
+    description="DeepDrone - AI-powered drone control with web interface",
     long_description=long_description,
     long_description_content_type="text/markdown",
     author="DeepDrone Team",
+    url="https://github.com/yourusername/deepdrone",
     packages=find_packages(),
     include_package_data=True,
     install_requires=requirements,
@@ -32,7 +33,9 @@ setup(
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
         "Topic :: System :: Hardware :: Hardware Drivers",
+        "Framework :: FastAPI",
     ],
 ) 

@@ -52,15 +52,20 @@
 
             <div class="model-info">
                 <span id="currentModel">DeepDrone</span>
-                <div class="status-dot" id="statusDot"></div>
             </div>
 
-            <button class="icon-btn" id="telemetryToggleBtn" title="Toggle telemetry">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="3" y="3" width="18" height="18" rx="2"/>
-                    <path d="M9 3v18"/>
-                </svg>
-            </button>
+            <div class="status-row">
+                <div class="status-badge" id="droneStatusBadge">
+                    <div class="status-dot"></div>
+                    <span>Drone: Not Connected</span>
+                </div>
+                <button class="icon-btn" id="telemetryToggleBtn" title="Toggle telemetry">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2"/>
+                        <path d="M9 3v18"/>
+                    </svg>
+                </button>
+            </div>
         </div>
 
         <!-- Chat Messages -->
@@ -167,16 +172,30 @@
                     <div id="aiStatus" class="status-msg"></div>
                 </div>
 
-                <div class="settings-section">
+                <div class="settings-section drone-section">
                     <h3>Drone Connection</h3>
+                    <div class="connection-notice">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <line x1="12" y1="16" x2="12" y2="12"/>
+                            <line x1="12" y1="8" x2="12.01" y2="8"/>
+                        </svg>
+                        <span>Connect to your drone to start flying</span>
+                    </div>
                     <div class="form-group">
                         <label>Connection String</label>
                         <input type="text" id="connectionString" class="input"
-                               value="udp:127.0.0.1:14550" placeholder="udp:127.0.0.1:14550">
-                        <small>Default: udp:127.0.0.1:14550 (simulator)</small>
+                               value="tcp:127.0.0.1:5760" placeholder="tcp:127.0.0.1:5760">
+                        <small>Default: tcp:127.0.0.1:5760 (simulator)</small>
                     </div>
                     <div class="drone-actions">
-                        <button class="btn-secondary" id="connectBtn">Connect Drone</button>
+                        <button class="btn-primary-drone" id="connectBtn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                                <path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
+                            </svg>
+                            Connect Drone
+                        </button>
                         <button class="btn-secondary" id="disconnectBtn" style="display: none;">Disconnect Drone</button>
                     </div>
                     <div id="droneStatus" class="status-msg"></div>

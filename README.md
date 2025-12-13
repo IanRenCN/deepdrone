@@ -1,117 +1,61 @@
-# 🚁 DeepDrone - AI-Powered Drone Control
+# 🚁 DeepDrone
 
 ![DeepDrone Demo](media/demo.png)
 
-**Control drones with natural language using AI models like OpenAI, Anthropic, Google, and local Ollama models - now with a beautiful web interface!**
+**Control drones with natural language using AI - OpenAI, Anthropic, Google, or local Ollama models.**
 
 ## 🚀 Quick Start
 
-### **One-Command Launch** (Easiest!)
-
 ```bash
-# Install dependencies (first time only)
+# Install dependencies
 pip3 install -r requirements.txt
 
-# Start everything (simulator + web interface)
-python3 start.py
-# or use: ./start.sh
+# Start everything
+./start.sh
 ```
 
-This automatically starts:
-- ✅ Drone simulator in the background
-- ✅ Web interface at http://localhost:8000
-- ✅ Opens your browser automatically
-
-### **Manual Launch** (Advanced)
-
-```bash
-# Terminal 1: Start simulator
-python3 simulate_drone.py
-
-# Terminal 2: Start web interface
-python3 main.py
-```
-
-The web interface features:
-- **🎨 Modern Browser UI**: Clean, intuitive chat interface
-- **⚙️ Easy Configuration**: Configure AI providers in the left sidebar
-- **🤖 Multiple AI Providers**: OpenAI, Anthropic, Google, or local Ollama
-- **📊 Live Telemetry**: Real-time drone status and metrics
-- **💬 Natural Language Control**: Chat with your drone like a copilot
+This launches the web interface at **http://localhost:8000** with the simulator running in the background.
 
 ## ✨ Features
 
-- 🌐 **Web Interface**: Beautiful browser-based chat UI with dark theme
-- 🤖 **Multi-AI Support**: OpenAI, Anthropic, Google, or local Ollama models
-- 🚁 **Real Drone Control**: DroneKit integration for actual flight control
-- 💬 **Natural Language**: Control drones with conversational commands
-- 📊 **Live Telemetry**: Real-time altitude, battery, GPS, and status
-- 🛠️ **Built-in Simulator**: Includes drone simulator for testing
-- 🔒 **Safe Operations**: Emergency stops and return-to-home functions
-- 🔌 **Auto Model Detection**: Automatically detects installed Ollama models
+- 🌐 **Web Interface** - Clean browser-based chat UI
+- 🤖 **Multiple AI Providers** - OpenAI, Anthropic, Google, or local Ollama
+- 🚁 **Real Drone Control** - DroneKit integration for actual flight
+- 💬 **Natural Language** - Control drones conversationally
+- 📊 **Live Telemetry** - Real-time altitude, battery, GPS
+- 🛠️ **Built-in Simulator** - Test without hardware
+- 🔒 **Safe Operations** - Emergency stops and return-to-home
 
-## 🛠️ Simulator Setup
-
-```bash
-# In a separate terminal, start the simulator:
-python3 simulate_drone.py
-
-# Then in the web interface:
-# 1. Configure your AI provider (e.g., select Ollama for local use)
-# 2. Enter connection string: udp:127.0.0.1:14550
-# 3. Click "Connect Drone"
-# 4. Start chatting with your drone!
-```
-
-## 📝 Example Commands
-
-Simply chat naturally with your drone:
+## 💬 Example Commands
 
 ```
-💬 "Take off to 20 meters"
-💬 "Fly to GPS coordinates 37.7749, -122.4194"
-💬 "Execute a square flight pattern with 50m sides"
-💬 "What's my current altitude and battery level?"
-💬 "Return home and land safely"
+"Take off to 20 meters"
+"Fly to GPS coordinates 37.7749, -122.4194"
+"Execute a square flight pattern with 50m sides"
+"What's my current altitude and battery level?"
+"Return home and land safely"
 ```
 
 ## 🔧 Requirements
 
 - Python 3.8+
 - DroneKit-Python
-- LiteLLM for cloud models
-- Ollama for local models (optional)
-
-## 🖥️ CLI Mode (Optional)
-
-Prefer the terminal? The classic CLI mode is still available:
-
-```bash
-python3 main.py --cli
-```
+- FastAPI + Uvicorn
+- LiteLLM (for cloud AI)
+- Ollama (optional, for local AI)
 
 ## 💻 Tech Stack
 
-**Backend:**
-- **FastAPI** - Modern async web framework with WebSocket support
-- **LiteLLM** - Unified interface for cloud AI models (OpenAI, Anthropic, Google)
-- **Ollama** - Local AI model execution and management
-- **DroneKit-Python** - Real drone control and telemetry
-- **Uvicorn** - High-performance ASGI server
+**Backend:** FastAPI, DroneKit-Python, LiteLLM, Ollama
+**Frontend:** Vanilla JavaScript, WebSocket, Modern CSS
 
-**Frontend:**
-- **Pure JavaScript** - No frameworks, fast and lightweight
-- **WebSocket** - Real-time bidirectional communication
-- **Modern CSS** - Beautiful dark theme with responsive design
+## 📖 Usage
 
-**Configuration:**
-- **Pydantic** - Configuration management and validation
-- **python-dotenv** - Environment variable management
+1. **Launch**: Run `./start.sh` to start the simulator and web interface
+2. **Configure AI**: Click Settings and choose your AI provider (Ollama is free and local)
+3. **Connect Drone**: The connection string `tcp:127.0.0.1:5760` is pre-filled
+4. **Start Flying**: Chat naturally with your drone
 
-## 📸 Screenshots
+## 📝 License
 
-The web interface includes:
-- **Left Sidebar**: AI provider configuration, drone connection, live telemetry
-- **Chat Area**: Natural language conversation with your drone
-- **Real-time Updates**: WebSocket-powered instant communication
-- **Status Indicators**: Visual feedback for AI and drone connection status
+GPL3 License - see [LICENSE](LICENSE) file for details.

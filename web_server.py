@@ -127,19 +127,35 @@ async def connect_drone(request: DroneConnectionRequest):
     global drone_controller
 
     try:
+        print(f"🔌 Attempting to connect to drone at: {request.connection_string}")
+
         drone_controller = DroneController(request.connection_string)
         success = drone_controller.connect_to_drone()
 
         if success:
+            print(f"✅ Successfully connected to drone")
             return {
                 "status": "success",
                 "message": f"Connected to drone at {request.connection_string}"
             }
         else:
-            raise HTTPException(status_code=400, detail="Failed to connect to drone")
+            error_msg = "Failed to connect to drone. Make sure the simulator is running (should be started automatically by start.sh)"
+            print(f"❌ {error_msg}")
+            raise HTTPException(status_code=400, detail=error_msg)
 
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        error_msg = f"Connection error: {str(e)}"
+        print(f"❌ {error_msg}")
+        import traceback
+        traceback.print_exc()
+
+        # Provide helpful error messages
+        if "Connection refused" in str(e):
+            error_msg = "Connection refused. Make sure the simulator is running (should be started automatically by start.sh)"
+        elif "timeout" in str(e).lower():
+            error_msg = "Connection timeout. The simulator may not be responding. Check if it's running on " + request.connection_string
+
+        raise HTTPException(status_code=400, detail=error_msg)
 
 @app.post("/api/drone/disconnect")
 async def disconnect_drone():
@@ -183,6 +199,7 @@ async def get_drone_status():
 async def websocket_chat(websocket: WebSocket):
     """WebSocket endpoint for real-time chat."""
     await websocket.accept()
+    print("✅ WebSocket client connected")
 
     try:
         while True:
@@ -190,6 +207,8 @@ async def websocket_chat(websocket: WebSocket):
             data = await websocket.receive_text()
             message_data = json.loads(data)
             user_message = message_data.get("message", "")
+
+            print(f"📨 Received message: {user_message}")
 
             # Send user message acknowledgment
             await websocket.send_json({
@@ -199,6 +218,7 @@ async def websocket_chat(websocket: WebSocket):
 
             # Check if LLM is configured
             if not llm_interface:
+                print("❌ LLM not configured")
                 await websocket.send_json({
                     "type": "error",
                     "content": "Please configure an AI provider first"
@@ -207,11 +227,14 @@ async def websocket_chat(websocket: WebSocket):
 
             # Process with LLM
             try:
+                print(f"🤖 Processing with LLM...")
+
                 # Get drone context if connected
                 drone_context = ""
                 if drone_controller and drone_controller.connected:
                     status = await get_drone_status()
                     drone_context = f"\nDrone Status: {json.dumps(status, indent=2)}"
+                    print(f"🚁 Added drone context")
 
                 # Create messages for LLM
                 system_prompt = f"""You are DeepDrone AI, an assistant that helps control drones using natural language.
@@ -231,10 +254,13 @@ If the drone is not connected, guide them to connect first."""
                 ]
 
                 # Get LLM response
+                print(f"⏳ Calling LLM chat method...")
                 response = await asyncio.to_thread(
                     llm_interface.chat,
                     messages
                 )
+
+                print(f"✅ Got LLM response: {response[:100]}...")
 
                 # Send AI response
                 await websocket.send_json({
@@ -242,16 +268,24 @@ If the drone is not connected, guide them to connect first."""
                     "content": response
                 })
 
+                print(f"📤 Sent response to client")
+
             except Exception as e:
+                print(f"❌ Error processing message: {str(e)}")
+                import traceback
+                traceback.print_exc()
+
                 await websocket.send_json({
                     "type": "error",
                     "content": f"Error processing message: {str(e)}"
                 })
 
     except WebSocketDisconnect:
-        print("Client disconnected")
+        print("🔌 Client disconnected")
     except Exception as e:
-        print(f"WebSocket error: {e}")
+        print(f"❌ WebSocket error: {e}")
+        import traceback
+        traceback.print_exc()
         await websocket.close()
 
 # Mount static files

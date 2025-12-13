@@ -51,7 +51,7 @@ class DeepDrone {
 
         // Top bar
         this.currentModel = document.getElementById('currentModel');
-        this.statusDot = document.getElementById('statusDot');
+        this.droneStatusBadge = document.getElementById('droneStatusBadge');
 
         // Telemetry
         this.telemetryPanel = document.getElementById('telemetryPanel');
@@ -256,8 +256,16 @@ class DeepDrone {
                     this.updateStatus(true, this.isDroneConnected);
                     this.showStatus(this.aiStatus, '✓ ' + data.message, 'success');
                     this.currentModel.textContent = `${provider} - ${model.split('/').pop()}`;
-                    this.sendBtn.disabled = false;
                     this.saveConfig({ provider, model });
+
+                    // Enable send button
+                    this.sendBtn.disabled = false;
+                    if (this.messageInput) {
+                        this.messageInput.disabled = false;
+                    }
+
+                    // Connect WebSocket
+                    console.log('🔌 Connecting WebSocket after AI config...');
                     this.connectWebSocket();
 
                     setTimeout(() => {
@@ -283,7 +291,8 @@ class DeepDrone {
 
         try {
             this.connectBtn.disabled = true;
-            this.showStatus(this.droneStatus, 'Connecting...', 'success');
+            this.connectBtn.textContent = 'Connecting...';
+            this.showStatus(this.droneStatus, 'Connecting to drone...', 'success');
 
             const response = await fetch('/api/drone/connect', {
                 method: 'POST',
@@ -291,20 +300,30 @@ class DeepDrone {
                 body: JSON.stringify({ connection_string: connStr })
             });
 
-            const data = await response.json();
-
-            if (response.ok) {
-                this.isDroneConnected = true;
-                this.updateStatus(this.isAIConfigured, true);
-                this.showStatus(this.droneStatus, '✓ ' + data.message, 'success');
-                this.connectBtn.style.display = 'none';
-                this.disconnectBtn.style.display = 'block';
-                this.startTelemetry();
-            } else {
+            if (!response.ok) {
+                const data = await response.json();
                 throw new Error(data.detail || 'Connection failed');
             }
+
+            const data = await response.json();
+
+            this.isDroneConnected = true;
+            this.updateStatus(this.isAIConfigured, true);
+            this.showStatus(this.droneStatus, '✓ ' + data.message, 'success');
+            this.connectBtn.style.display = 'none';
+            this.disconnectBtn.style.display = 'block';
+            this.startTelemetry();
+
         } catch (error) {
+            console.error('Drone connection error:', error);
             this.showStatus(this.droneStatus, '✗ ' + error.message, 'error');
+            this.connectBtn.innerHTML = `
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                    <path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
+                </svg>
+                Connect Drone
+            `;
         } finally {
             this.connectBtn.disabled = false;
         }
@@ -361,7 +380,8 @@ class DeepDrone {
     // Chat
     handleInputChange() {
         const value = this.messageInput.value.trim();
-        this.sendBtn.disabled = !value || !this.isAIConfigured;
+        // Only disable if no value, let sendMessage handle AI config check
+        this.sendBtn.disabled = !value;
 
         // Auto-resize textarea
         this.messageInput.style.height = 'auto';
@@ -378,7 +398,14 @@ class DeepDrone {
     sendMessage() {
         const message = this.messageInput.value.trim();
 
-        if (!message || !this.isAIConfigured) return;
+        if (!message) return;
+
+        // Check if AI is configured
+        if (!this.isAIConfigured) {
+            this.addMessage('Please configure an AI provider first. Click Settings in the sidebar to get started.', 'error');
+            this.messageInput.value = '';
+            return;
+        }
 
         // Remove welcome screen
         const welcome = this.messages.querySelector('.welcome-screen');
@@ -387,9 +414,17 @@ class DeepDrone {
         // Add user message
         this.addMessage(message, 'user');
 
+        // Add typing indicator
+        this.addTypingIndicator();
+
         // Send to server
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            console.log('📤 Sending message:', message);
             this.ws.send(JSON.stringify({ message }));
+        } else {
+            console.error('❌ WebSocket not connected. State:', this.ws ? this.ws.readyState : 'null');
+            this.removeTypingIndicator();
+            this.addMessage('Error: Not connected to server. Please refresh the page.', 'error');
         }
 
         // Clear input
@@ -410,6 +445,34 @@ class DeepDrone {
         this.messages.appendChild(messageDiv);
 
         // Scroll to bottom
+        this.scrollToBottom();
+    }
+
+    addTypingIndicator() {
+        const indicator = document.createElement('div');
+        indicator.className = 'message assistant typing-indicator';
+        indicator.id = 'typingIndicator';
+        indicator.innerHTML = `
+            <div class="message-content">
+                <div class="typing-dots">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+        `;
+        this.messages.appendChild(indicator);
+        this.scrollToBottom();
+    }
+
+    removeTypingIndicator() {
+        const indicator = document.getElementById('typingIndicator');
+        if (indicator) {
+            indicator.remove();
+        }
+    }
+
+    scrollToBottom() {
         this.messages.parentElement.scrollTop = this.messages.parentElement.scrollHeight;
     }
 
@@ -422,34 +485,56 @@ class DeepDrone {
 
         this.ws = new WebSocket(wsUrl);
 
-        this.ws.onopen = () => console.log('WebSocket connected');
+        this.ws.onopen = () => {
+            console.log('✅ WebSocket connected');
+        };
 
         this.ws.onmessage = (event) => {
+            console.log('📨 Received message:', event.data);
             const data = JSON.parse(event.data);
 
             if (data.type === 'ai_message') {
+                // Remove typing indicator
+                this.removeTypingIndicator();
+                console.log('🤖 AI response:', data.content);
                 this.addMessage(data.content, 'assistant');
             } else if (data.type === 'error') {
+                // Remove typing indicator
+                this.removeTypingIndicator();
+                console.log('❌ Error:', data.content);
                 this.addMessage(data.content, 'error');
+            } else if (data.type === 'user_message') {
+                // User message already shown, just for acknowledgment
+                console.log('✓ User message acknowledged');
             }
         };
 
-        this.ws.onerror = (error) => console.error('WebSocket error:', error);
+        this.ws.onerror = (error) => {
+            console.error('❌ WebSocket error:', error);
+            this.removeTypingIndicator();
+        };
 
         this.ws.onclose = () => {
-            console.log('WebSocket closed');
+            console.log('🔌 WebSocket closed');
+            this.removeTypingIndicator();
             setTimeout(() => {
-                if (this.isAIConfigured) this.connectWebSocket();
+                if (this.isAIConfigured) {
+                    console.log('🔄 Attempting to reconnect...');
+                    this.connectWebSocket();
+                }
             }, 3000);
         };
     }
 
     // Status
     updateStatus(aiConfigured, droneConnected) {
-        if (aiConfigured || droneConnected) {
-            this.statusDot.classList.add('connected');
+        // Update drone status badge
+        if (droneConnected) {
+            this.droneStatusBadge.classList.add('connected');
+            this.droneStatusBadge.querySelector('span').textContent = 'Drone: Connected';
         } else {
-            this.statusDot.classList.remove('connected');
+            this.droneStatusBadge.classList.remove('connected');
+            this.droneStatusBadge.querySelector('span').textContent = 'Drone: Not Connected';
         }
     }
 

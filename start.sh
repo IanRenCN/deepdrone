@@ -18,15 +18,24 @@ echo ""
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$DIR"
 
+# Clean up ports before starting
+echo "🧹 Cleaning up ports..."
+lsof -ti:8000 | xargs kill -9 2>/dev/null || true
+lsof -ti:5760 | xargs kill -9 2>/dev/null || true
+pkill -f simple_simulator.py 2>/dev/null || true
+sleep 1
+echo "✓ Ports cleaned"
+echo ""
+
 # Start simulator in background
 echo "🚁 Starting drone simulator..."
-python3 simulate_drone.py > /tmp/deepdrone_simulator.log 2>&1 &
+python3 simple_simulator.py > /tmp/deepdrone_simulator.log 2>&1 &
 SIMULATOR_PID=$!
 echo "✓ Simulator started (PID: $SIMULATOR_PID)"
 echo ""
 
 # Wait a moment for simulator to initialize
-sleep 1
+sleep 2
 
 # Function to cleanup on exit
 cleanup() {
@@ -55,7 +64,7 @@ echo "📱 Opening browser at: http://localhost:8000"
 echo ""
 echo "💡 Quick Start Guide:"
 echo "   1. Select an AI provider (Ollama for local/free)"
-echo "   2. Connection string is pre-filled: udp:127.0.0.1:14550"
+echo "   2. Connection string is pre-filled: tcp:127.0.0.1:5760"
 echo "   3. Click 'Connect Drone'"
 echo "   4. Start chatting with your drone!"
 echo ""

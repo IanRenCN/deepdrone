@@ -56,6 +56,8 @@ This launches the web interface at **http://localhost:8000** with the simulator 
 3. **Connect Drone**: The connection string `tcp:127.0.0.1:5760` is pre-filled
 4. **Start Flying**: Chat naturally with your drone
 
+![DeepDrone Demo](media/star-history-20251213.png)
+
 ## 📝 License
 
 GPL3 License - see [LICENSE](LICENSE) file for details.

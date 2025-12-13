@@ -26,11 +26,8 @@ class DeepDrone {
 
         // Modals
         this.settingsModal = document.getElementById('settingsModal');
-        this.droneModal = document.getElementById('droneModal');
         this.settingsBtn = document.getElementById('settingsBtn');
-        this.droneConnectBtn = document.getElementById('droneConnectBtn');
         this.closeSettingsBtn = document.getElementById('closeSettingsBtn');
-        this.closeDroneBtn = document.getElementById('closeDroneBtn');
 
         // Settings form
         this.provider = document.getElementById('provider');
@@ -38,7 +35,7 @@ class DeepDrone {
         this.apiKey = document.getElementById('apiKey');
         this.modelGroup = document.getElementById('modelGroup');
         this.model = document.getElementById('model');
-        this.saveAIBtn = document.getElementById('saveAIBtn');
+        this.saveBtn = document.getElementById('saveBtn');
         this.aiStatus = document.getElementById('aiStatus');
 
         // Drone form
@@ -74,23 +71,18 @@ class DeepDrone {
 
         // Modal controls
         this.settingsBtn.addEventListener('click', () => this.openModal(this.settingsModal));
-        this.droneConnectBtn.addEventListener('click', () => this.openModal(this.droneModal));
         this.closeSettingsBtn.addEventListener('click', () => this.closeModal(this.settingsModal));
-        this.closeDroneBtn.addEventListener('click', () => this.closeModal(this.droneModal));
 
         // Click outside modal to close
         this.settingsModal.addEventListener('click', (e) => {
             if (e.target === this.settingsModal) this.closeModal(this.settingsModal);
-        });
-        this.droneModal.addEventListener('click', (e) => {
-            if (e.target === this.droneModal) this.closeModal(this.droneModal);
         });
 
         // Settings
         this.provider.addEventListener('change', () => this.onProviderChange());
         this.model.addEventListener('change', () => this.updateSaveButton());
         this.apiKey.addEventListener('input', () => this.updateSaveButton());
-        this.saveAIBtn.addEventListener('click', () => this.saveAISettings());
+        this.saveBtn.addEventListener('click', () => this.saveSettings());
 
         // Drone
         this.connectBtn.addEventListener('click', () => this.connectDrone());
@@ -129,7 +121,6 @@ class DeepDrone {
     newChat() {
         this.messages.innerHTML = `
             <div class="welcome-screen">
-                <div class="welcome-icon">🚁</div>
                 <h1>DeepDrone</h1>
                 <p>Control your drone with natural language</p>
                 <div class="suggestion-grid">
@@ -238,43 +229,46 @@ class DeepDrone {
         const apiKey = this.apiKey.value;
 
         if (provider === 'ollama') {
-            this.saveAIBtn.disabled = !provider || !model;
+            this.saveBtn.disabled = !provider || !model;
         } else {
-            this.saveAIBtn.disabled = !provider || !model || !apiKey;
+            this.saveBtn.disabled = !provider || !model || !apiKey;
         }
     }
 
-    async saveAISettings() {
+    async saveSettings() {
+        // Save AI config
         const provider = this.provider.value;
         const model = this.model.value;
         const apiKey = provider === 'ollama' ? null : this.apiKey.value;
 
-        try {
-            const response = await fetch('/api/config', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ provider, model, api_key: apiKey })
-            });
+        if (provider && model) {
+            try {
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ provider, model, api_key: apiKey })
+                });
 
-            const data = await response.json();
+                const data = await response.json();
 
-            if (response.ok) {
-                this.isAIConfigured = true;
-                this.updateStatus(true, false);
-                this.showStatus(this.aiStatus, '✓ ' + data.message, 'success');
-                this.currentModel.textContent = `${provider} - ${model.split('/').pop()}`;
-                this.sendBtn.disabled = false;
-                this.saveConfig({ provider, model });
-                this.connectWebSocket();
+                if (response.ok) {
+                    this.isAIConfigured = true;
+                    this.updateStatus(true, this.isDroneConnected);
+                    this.showStatus(this.aiStatus, '✓ ' + data.message, 'success');
+                    this.currentModel.textContent = `${provider} - ${model.split('/').pop()}`;
+                    this.sendBtn.disabled = false;
+                    this.saveConfig({ provider, model });
+                    this.connectWebSocket();
 
-                setTimeout(() => {
-                    this.closeModal(this.settingsModal);
-                }, 1500);
-            } else {
-                throw new Error(data.detail || 'Configuration failed');
+                    setTimeout(() => {
+                        this.closeModal(this.settingsModal);
+                    }, 1500);
+                } else {
+                    throw new Error(data.detail || 'Configuration failed');
+                }
+            } catch (error) {
+                this.showStatus(this.aiStatus, '✗ ' + error.message, 'error');
             }
-        } catch (error) {
-            this.showStatus(this.aiStatus, '✗ ' + error.message, 'error');
         }
     }
 
@@ -306,10 +300,6 @@ class DeepDrone {
                 this.connectBtn.style.display = 'none';
                 this.disconnectBtn.style.display = 'block';
                 this.startTelemetry();
-
-                setTimeout(() => {
-                    this.closeModal(this.droneModal);
-                }, 1500);
             } else {
                 throw new Error(data.detail || 'Connection failed');
             }

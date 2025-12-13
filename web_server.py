@@ -100,11 +100,13 @@ async def configure_ai(config: ConfigRequest):
     global llm_interface, current_config
 
     try:
-        # Create model config
+        # Create model config with required fields
         model_config = ModelConfig(
+            name=f"{config.provider}-{config.model.split('/')[-1]}",
             provider=config.provider,
-            model=config.model,
-            api_key=config.api_key or os.getenv(f"{config.provider.upper()}_API_KEY")
+            model_id=config.model,
+            api_key=config.api_key or os.getenv(f"{config.provider.upper()}_API_KEY"),
+            base_url="http://localhost:11434" if config.provider == "ollama" else None
         )
 
         # Initialize LLM interface

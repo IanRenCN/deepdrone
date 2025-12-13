@@ -103,31 +103,95 @@ class DroneController:
         """
         if not self._ensure_connected():
             return False
+        
+        # Wait for GPS lock before attempting takeoff
+        logger.info("Checking GPS lock...")
+        if not self._wait_for_gps_lock(timeout=30):
+            logger.error("GPS lock not acquired")
+            return False
+        
+        # Check if vehicle is armable
+        logger.info(f"Pre-flight checks: Armable={self.vehicle.is_armable}, System Status={self.vehicle.system_status.state}")
+        
+        # Wait for vehicle to be armable
+        logger.info("Waiting for vehicle to be armable...")
+        timeout = 30
+        start = time.time()
+        while not self.vehicle.is_armable:
+            if time.time() - start > timeout:
+                logger.error(f"Vehicle not armable after {timeout}s. System status: {self.vehicle.system_status.state}")
+                return False
+            logger.info(f"Waiting... Armable: {self.vehicle.is_armable}, System: {self.vehicle.system_status.state}")
+            time.sleep(1)
+        
+        logger.info("Vehicle is armable!")
+        
+        # Give the vehicle a moment to fully initialize after becoming armable
+        logger.info("Waiting for vehicle to fully initialize...")
+        time.sleep(2)
+        
+        logger.info("Switching to GUIDED mode...")
+        
+        # Check current mode
+        current_mode = self.vehicle.mode.name
+        logger.info(f"Current mode: {current_mode}")
+        
+        # Try switching to GUIDED mode
+        try:
+            # Method 1: Direct mode setting
+            logger.info("Attempting mode change to GUIDED...")
+            self.vehicle.mode = VehicleMode("GUIDED")
+            self.vehicle.flush()  # Flush the message buffer
+            time.sleep(1)
             
-        logger.info("Arming motors...")
-        # Switch to GUIDED mode
-        self.vehicle.mode = VehicleMode("GUIDED")
+            # Check if mode changed
+            logger.info(f"Mode after first attempt: {self.vehicle.mode.name}")
+            
+            # If still not in GUIDED, try MAVLink command
+            if self.vehicle.mode.name != "GUIDED":
+                logger.info("Direct mode change didn't work, trying MAVLink command...")
+                # Send MAVLink SET_MODE command
+                # GUIDED mode number is 4 for Copter
+                msg = self.vehicle.message_factory.set_mode_encode(
+                    0,  # target system
+                    mavutil.mavlink.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED,
+                    4   # GUIDED mode for copter
+                )
+                self.vehicle.send_mavlink(msg)
+                self.vehicle.flush()
+                time.sleep(1)
+                logger.info(f"Mode after MAVLink attempt: {self.vehicle.mode.name}")
+        except Exception as e:
+            logger.error(f"Error setting mode: {e}")
         
         # Wait until mode change is verified
-        timeout = 10  # seconds
+        timeout = 15  # seconds
         start = time.time()
         while self.vehicle.mode.name != "GUIDED":
             if time.time() - start > timeout:
-                logger.error("Failed to enter GUIDED mode")
+                logger.error(f"Failed to enter GUIDED mode (stuck in {self.vehicle.mode.name})")
+                logger.error("This might be a simulator issue. Try restarting the simulator.")
                 return False
+            logger.info(f"Waiting for GUIDED mode... Current: {self.vehicle.mode.name}")
             time.sleep(0.5)
+        
+        logger.info("GUIDED mode confirmed!")
+        logger.info("Arming motors...")
         
         # Arm the drone
         self.vehicle.armed = True
         
         # Wait for arming
-        timeout = 10  # seconds
+        timeout = 15  # seconds (increased timeout)
         start = time.time()
         while not self.vehicle.armed:
             if time.time() - start > timeout:
-                logger.error("Failed to arm")
+                logger.error(f"Failed to arm. Armable: {self.vehicle.is_armable}, System Status: {self.vehicle.system_status.state}")
                 return False
+            logger.info(f"Waiting to arm... Armed: {self.vehicle.armed}, Armable: {self.vehicle.is_armable}")
             time.sleep(0.5)
+        
+        logger.info("Armed successfully!")
         
         logger.info("Taking off!")
         # Take off to target altitude
@@ -361,6 +425,47 @@ class DroneController:
             logger.error("Not connected to a drone. Call connect_to_drone() first.")
             return False
         return True
+    
+    def _wait_for_gps_lock(self, timeout: int = 30) -> bool:
+        """
+        Wait for GPS to get a 3D fix.
+        
+        Args:
+            timeout: Maximum time to wait in seconds
+            
+        Returns:
+            bool: True if GPS lock acquired, False if timeout
+        """
+        logger.info("Waiting for GPS lock...")
+        start_time = time.time()
+        
+        while time.time() - start_time < timeout:
+            try:
+                # Check GPS fix type
+                # GPS fix types: 0=No GPS, 1=No Fix, 2=2D Fix, 3=3D Fix
+                if self.vehicle.gps_0:
+                    fix_type = self.vehicle.gps_0.fix_type
+                    logger.info(f"GPS Fix Type: {fix_type}")
+                    
+                    if fix_type >= 3:
+                        # 3D fix acquired
+                        satellites = self.vehicle.gps_0.satellites_visible
+                        logger.info(f"GPS Lock acquired! Satellites: {satellites}, Fix Type: {fix_type}")
+                        return True
+                    elif fix_type == 2:
+                        logger.info("2D GPS fix, waiting for 3D fix...")
+                    else:
+                        logger.info("No GPS fix yet, waiting...")
+                else:
+                    logger.info("GPS not available, waiting...")
+                
+                time.sleep(1)
+            except Exception as e:
+                logger.warning(f"Error checking GPS status: {e}")
+                time.sleep(1)
+        
+        logger.error(f"GPS lock not acquired after {timeout} seconds")
+        return False
 
 
 # Convenience functions for using the controller without creating an instance

@@ -108,7 +108,7 @@ class FunctionExecutor:
                 success = self.drone_controller.arm_and_takeoff(altitude)
                 return {
                     "success": success,
-                    "message": f"Successfully took off to {altitude}m" if success else "Takeoff failed"
+                    "message": f"Successfully took off to {altitude}m! The drone is now airborne." if success else "Takeoff failed. The drone may need more time for GPS lock or system initialization."
                 }
             
             elif function_name == "land":

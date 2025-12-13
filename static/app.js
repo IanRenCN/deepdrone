@@ -350,8 +350,10 @@ class DeepDrone {
     }
 
     startTelemetry() {
+        // Stop any existing telemetry first
+        this.stopTelemetry();
         this.updateTelemetry();
-        this.telemetryInterval = setInterval(() => this.updateTelemetry(), 1000);
+        this.telemetryInterval = setInterval(() => this.updateTelemetry(), 3000);  // Reduced from 1s to 3s
     }
 
     stopTelemetry() {
@@ -433,7 +435,7 @@ class DeepDrone {
         this.handleInputChange();
     }
 
-    addMessage(content, type) {
+    addMessage(content, type, metadata = null) {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${type}`;
 
@@ -442,6 +444,41 @@ class DeepDrone {
         contentDiv.textContent = content;
 
         messageDiv.appendChild(contentDiv);
+
+        // Add thinking section if metadata includes thinking
+        if (metadata && metadata.thinking && metadata.thinking_time) {
+            const thinkingDiv = document.createElement('div');
+            thinkingDiv.className = 'thinking-section';
+            
+            const thinkingHeader = document.createElement('div');
+            thinkingHeader.className = 'thinking-header';
+            thinkingHeader.innerHTML = `
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                    <line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+                <span>Thought for ${metadata.thinking_time}s</span>
+                <svg class="chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"/>
+                </svg>
+            `;
+            
+            const thinkingContent = document.createElement('div');
+            thinkingContent.className = 'thinking-content';
+            thinkingContent.textContent = metadata.thinking;
+            
+            thinkingDiv.appendChild(thinkingHeader);
+            thinkingDiv.appendChild(thinkingContent);
+            
+            // Toggle thinking on click
+            thinkingHeader.addEventListener('click', () => {
+                thinkingDiv.classList.toggle('expanded');
+            });
+            
+            messageDiv.appendChild(thinkingDiv);
+        }
+
         this.messages.appendChild(messageDiv);
 
         // Scroll to bottom
@@ -497,7 +534,7 @@ class DeepDrone {
                 // Remove typing indicator
                 this.removeTypingIndicator();
                 console.log('🤖 AI response:', data.content);
-                this.addMessage(data.content, 'assistant');
+                this.addMessage(data.content, 'assistant', data.metadata);
             } else if (data.type === 'error') {
                 // Remove typing indicator
                 this.removeTypingIndicator();

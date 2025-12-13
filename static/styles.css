@@ -270,6 +270,62 @@ body {
     word-wrap: break-word;
 }
 
+/* Thinking Section */
+.thinking-section {
+    margin-top: 12px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.thinking-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+.thinking-header:hover {
+    background: var(--hover-color);
+}
+
+.thinking-header svg {
+    flex-shrink: 0;
+}
+
+.thinking-header .chevron {
+    margin-left: auto;
+    transition: transform 0.2s;
+}
+
+.thinking-section.expanded .chevron {
+    transform: rotate(180deg);
+}
+
+.thinking-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+    padding: 0 12px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.thinking-section.expanded .thinking-content {
+    max-height: 500px;
+    overflow-y: auto;
+    padding: 0 12px 12px 12px;
+}
+
 /* Typing Indicator */
 .typing-indicator {
     opacity: 0.6;

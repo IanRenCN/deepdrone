@@ -20,6 +20,7 @@ from dotenv import load_dotenv
 from drone.config import ModelConfig
 from drone.llm_interface import LLMInterface
 from drone.drone_control import DroneController
+from drone.function_tools import FunctionExecutor, format_function_schemas_for_ollama, FUNCTION_SCHEMAS
 
 # Load environment variables
 load_dotenv()
@@ -200,6 +201,9 @@ async def websocket_chat(websocket: WebSocket):
     """WebSocket endpoint for real-time chat."""
     await websocket.accept()
     print("✅ WebSocket client connected")
+    
+    # Create function executor
+    function_executor = FunctionExecutor(drone_controller)
 
     try:
         while True:
@@ -228,25 +232,34 @@ async def websocket_chat(websocket: WebSocket):
             # Process with LLM
             try:
                 print(f"🤖 Processing with LLM...")
+                
+                # Update function executor with current drone controller
+                function_executor.drone_controller = drone_controller
 
                 # Get drone context if connected
                 drone_context = ""
                 if drone_controller and drone_controller.connected:
                     status = await get_drone_status()
-                    drone_context = f"\nDrone Status: {json.dumps(status, indent=2)}"
+                    drone_context = f"\nCurrent Drone Status: {json.dumps(status, indent=2)}"
                     print(f"🚁 Added drone context")
 
-                # Create messages for LLM
-                system_prompt = f"""You are DeepDrone AI, an assistant that helps control drones using natural language.
-You can help with:
-- Connecting to drones
-- Flight commands (takeoff, land, movement)
-- Flight patterns and waypoints
-- Safety operations (emergency stop, return to home)
-{drone_context}
+                # Add function schemas for Ollama
+                functions_info = ""
+                if current_config and current_config.provider == "ollama":
+                    functions_info = "\n\n" + format_function_schemas_for_ollama(FUNCTION_SCHEMAS)
 
-When the user wants to perform a drone action, provide clear, step-by-step instructions.
-If the drone is not connected, guide them to connect first."""
+                # Create messages for LLM
+                system_prompt = f"""You are DeepDrone AI, an assistant that controls drones using natural language.
+
+IMPORTANT: When the user asks you to perform a drone action (like takeoff, land, fly somewhere, etc.), you MUST execute the appropriate function immediately. Do NOT just provide instructions - actually execute the command.
+{drone_context}
+{functions_info}
+
+When executing commands:
+1. Use the functions to perform the action
+2. After getting the function result, explain what happened to the user in a friendly way
+
+If the drone is not connected, politely inform them to connect the drone first through the Settings menu."""
 
                 messages = [
                     {"role": "system", "content": system_prompt},
@@ -255,20 +268,89 @@ If the drone is not connected, guide them to connect first."""
 
                 # Get LLM response
                 print(f"⏳ Calling LLM chat method...")
-                response = await asyncio.to_thread(
-                    llm_interface.chat,
+                response_data = await asyncio.to_thread(
+                    llm_interface.chat_with_metadata,
                     messages
                 )
 
-                print(f"✅ Got LLM response: {response[:100]}...")
+                print(f"✅ Got LLM response")
+                print(f"Response data type: {type(response_data)}")
+                print(f"Response data keys: {response_data.keys() if isinstance(response_data, dict) else 'NOT A DICT'}")
+                
+                # Check if response contains a function call
+                response_content = response_data.get("content", "") if isinstance(response_data, dict) else str(response_data)
+                print(f"Response content preview (first 200 chars): {response_content[:200]}")
+                
+                # Parse function calls from response
+                if "EXECUTE_FUNCTION:" in response_content:
+                    print("🔧 Function call detected in response")
+                    
+                    # Extract function name and arguments
+                    lines = response_content.split('\n')
+                    function_name = None
+                    arguments = {}
+                    
+                    for i, line in enumerate(lines):
+                        if line.startswith("EXECUTE_FUNCTION:"):
+                            function_name = line.replace("EXECUTE_FUNCTION:", "").strip()
+                        elif line.startswith("ARGUMENTS:"):
+                            try:
+                                args_str = line.replace("ARGUMENTS:", "").strip()
+                                arguments = json.loads(args_str) if args_str else {}
+                            except json.JSONDecodeError:
+                                print(f"⚠️  Failed to parse arguments: {line}")
+                    
+                    if function_name:
+                        print(f"⚡ Executing function: {function_name} with args: {arguments}")
+                        
+                        # Execute the function
+                        result = await asyncio.to_thread(
+                            function_executor.execute_function,
+                            function_name,
+                            arguments
+                        )
+                        
+                        print(f"✅ Function result: {result}")
+                        
+                        # Ask LLM to format the result for the user
+                        follow_up_prompt = f"""The function {function_name} was executed with result: {json.dumps(result)}
+
+Please explain this result to the user in a natural, friendly way. Be concise."""
+                        
+                        messages.append({"role": "assistant", "content": response_content})
+                        messages.append({"role": "user", "content": follow_up_prompt})
+                        
+                        # Get formatted response
+                        final_response_data = await asyncio.to_thread(
+                            llm_interface.chat_with_metadata,
+                            messages
+                        )
+                        
+                        response_data = final_response_data
 
                 # Send AI response
-                await websocket.send_json({
-                    "type": "ai_message",
-                    "content": response
-                })
-
-                print(f"📤 Sent response to client")
+                if response_data and isinstance(response_data, dict) and response_data.get("content"):
+                    # Prepare metadata (thinking info)
+                    metadata = {}
+                    if response_data.get("thinking"):
+                        metadata["thinking"] = response_data["thinking"]
+                        metadata["thinking_time"] = response_data.get("thinking_time", 0)
+                    
+                    content_to_send = response_data["content"]
+                    print(f"📤 Sending content to client (length: {len(content_to_send)}, preview: {content_to_send[:100]})")
+                    
+                    await websocket.send_json({
+                        "type": "ai_message",
+                        "content": content_to_send,
+                        "metadata": metadata if metadata else None
+                    })
+                    print(f"📤 Sent response to client successfully")
+                else:
+                    print(f"⚠️  Empty response from LLM!")
+                    await websocket.send_json({
+                        "type": "error",
+                        "content": "Received empty response from AI model"
+                    })
 
             except Exception as e:
                 print(f"❌ Error processing message: {str(e)}")

@@ -31,7 +31,7 @@ class DroneController:
         self.connection_string = connection_string
         self.connected = False
     
-    def connect_to_drone(self, connection_string: str = None, timeout: int = 30) -> bool:
+    def connect_to_drone(self, connection_string: str = None, timeout: int = 10) -> bool:
         """
         Connect to the drone using DroneKit.
         
